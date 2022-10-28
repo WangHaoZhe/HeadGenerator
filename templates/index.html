@@ -1,0 +1,349 @@
+<!--
+ * @Author: wangchen35
+ * @Date: 2022-03-31 20:40:23
+ * @LastEditors: wangchen35
+ * @LastEditTime: 2022-06-19 13:35:57
+ * @Description: file content
+-->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>demo</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    {% load static %}
+</head>
+
+<body>
+    <div class="header">
+        <div class="icon">学校图标</div>
+    </div>
+    <div class="content">
+        <div class="box upload">
+            <div class="img-box" id="upload-img"></div>
+            <input type="file" class="upload-button" accept=".png,.jpg">
+            <div class="button-box">
+                <div class="button clear-button">重新选择图片</div>
+                <div class="button choose-style">选择样式</div>
+            </div>
+        </div>
+        <div class="button handle-button">生成</div>
+        <div class="box perview">
+            <div class="img-box" id="preview-img"></div>
+            <div class="button-box">
+                <div class="button download">下载</div>
+            </div>
+        </div>
+
+        <div class="style-box">
+            <div class="image-list"></div>
+            <div class="button-box">
+                <div class="button close-button">关闭</div>
+                <div class="button confirm-button">确定</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+<script>
+    const { get, post } = axios;
+
+    // get(url).then(res => {
+    //     // res.data是接口返回内容
+    // })
+
+    // post(url, params).then(res => {
+    //     // res.data是接口返回内容
+    // })
+    let imageData = null;
+    let styleData = null;
+    let styleImageKey = null;
+    let resultImage = null;
+
+    const imgBox = document.getElementById('upload-img');
+    const preViewImgBox = document.getElementById('preview-img');
+    const fileInput = document.getElementsByClassName('upload-button')[0];
+    const clearButton = document.getElementsByClassName('clear-button')[0];
+    const styleButton = document.getElementsByClassName('choose-style')[0];
+    const styleBox = document.getElementsByClassName('style-box')[0];
+    const closeButton = document.getElementsByClassName('close-button')[0];
+    const confirmButton = document.getElementsByClassName('confirm-button')[0];
+    const handleButton = document.getElementsByClassName('handle-button')[0];
+    const downloadButton = document.getElementsByClassName('download')[0];
+    const imageList = document.getElementsByClassName('image-list')[0];
+    let provisionalStyleImg = null;
+
+    // 样式列表
+    let styleList = [{
+        src: 'https://mapdata.bj.bcebos.com/images/guangzhou/noPark@3x.png',
+        key: 1
+    }, {
+        src: 'https://mapdata.bj.bcebos.com/images/guangzhou/noPark@3x.png',
+        key: 2
+    }, {
+        src: 'https://mapdata.bj.bcebos.com/images/guangzhou/noPark@3x.png',
+        key: 3
+    }, {
+        src: 'https://mapdata.bj.bcebos.com/images/guangzhou/noPark@3x.png',
+        key: 4
+    }
+    ]
+
+
+
+
+    // 重新上传图片逻辑
+    clearButton.addEventListener('click', () => {
+        imgBox.style.backgroundImage = '';
+        fileInput.value = null;
+        fileInput.classList.remove('hide');
+        clearButton.classList.remove('show');
+    });
+
+    // 点击样式 弹出样式列表
+    let styleImgList = [];
+    styleButton.addEventListener('click', () => {
+        styleImgList.length && styleImgList.forEach(node => {
+            imageList.removeChild(node);
+            styleImgList = [];
+        });
+        styleList.forEach(styleItem => {
+            const img = document.createElement('img');
+            img.src = styleItem.src
+            img.id = styleItem.key;
+            imageList.appendChild(img);
+            styleImgList.push(img);
+            if (styleImageKey && styleImageKey == styleItem.key) {
+                img.classList.add('active');
+            }
+
+            img.addEventListener('click', function () {
+                styleImgList.forEach(item => {
+                    item.classList.remove('active');
+                })
+                this.classList.add('active');
+                provisionalStyleImg = this;
+            });
+        })
+        styleBox.classList.add('show');
+    })
+
+    // 点击关闭
+    closeButton.addEventListener('click', () => {
+        styleBox.classList.remove('show');
+        provisionalStyleImg = null;
+    });
+
+    // 点击生成逻辑
+    let handleLock = false;
+    handleButton.addEventListener('click', () => {
+        console.log(imageData, styleData)
+        if (!imageData || !styleImageKey) {
+            alert('请正确选择图片和样式')
+            return;
+        }
+        if (handleLock) {
+            alert('请等待图片处理完毕')
+            return;
+        }
+        handleLock = true;
+        // 生成逻辑 读imageData和styleData
+        console.log(imageData, styleImageKey);
+        // 用两个data调用你的脚本逻辑 拿到右侧预览图片地址后
+        var preImageUrl = {{new_img_path|safe}};
+        preViewImgBox.style.backgroundImage = `url(${preImageUrl})`;
+        resultImage = preImageUrl;
+    });
+
+    const getImageData = (file) => {
+        const reader = new FileReader();
+        return new Promise(resolve => {
+            reader.onload = function (event) {
+                // 图片数据
+                resolve(event.target.result);
+            };
+            // 数据输出格式 目前是 原始的二进制数据
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const setStyleImageData = (url) => {
+        return new Promise(resolve => {
+            get(url + `?timestamp=${new Date().getTime()}`, {
+                responseType: 'blob'
+            }).then(res => {
+                getImageData(res.data).then(data => {
+                    resolve(data);
+                });
+            })
+        })
+    };
+
+    // 点击确认样式
+    confirmButton.addEventListener('click', () => {
+        styleImageKey = provisionalStyleImg.id;
+        styleButton.innerHTML = `已选择样式${styleImageKey}`;
+        setStyleImageData(provisionalStyleImg.src).then(data => {
+            // styleData = data;
+            styleBox.classList.remove('show');
+            provisionalStyleImg = null;
+        });
+    })
+
+    const getImageUrl = (file) => {
+        const reader = new FileReader();
+        const that = this;
+        reader.onload = function (event) {
+            const url = event.target.result;
+            imgBox.style.backgroundImage = `url(${url})`;
+
+            fileInput.classList.add('hide');
+            clearButton.classList.add('show');
+        };
+        reader.readAsDataURL(file);
+    };
+
+    fileInput.addEventListener('change', (fileEvent) => {
+        getImageData(fileEvent.target.files[0]).then(data => {
+            imageData = data;
+        });
+        getImageUrl(fileEvent.target.files[0]);
+    });
+
+    const download = (url) => {
+        const a = document.createElement('a')
+        get(url + `?timestamp=${new Date().getTime()}`, {
+            responseType: 'blob'
+        }).then(res => {
+            a.href = URL.createObjectURL(res.data);
+            a.download = '图片名称'
+            a.click();
+            URL.revokeObjectURL(url)
+        })
+
+    }
+
+    // 点击下载
+    downloadButton.addEventListener('click', () => {
+        download(resultImage);
+    });
+</script>
+<style>
+    html,
+    body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        box-sizing: border-box;
+    }
+
+    body {
+        padding: 20px;
+    }
+
+    .header {
+        border-bottom: 1px solid #333;
+        margin-bottom: 10px;
+    }
+
+    .content {
+        display: flex;
+        justify-content: space-around;
+    }
+
+    .box {
+        height: 400px;
+        width: 400px;
+        position: relative;
+    }
+
+    .handle-button {
+        margin: 200px 20px;
+    }
+
+    .img-box {
+        width: 100%;
+        height: 100%;
+        background-color: #e2e2e2;
+        border-radius: 10px;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
+
+    .upload-button {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    .button-box {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    .button-box div {
+        margin-right: 10px;
+    }
+
+    .button {
+        cursor: pointer;
+        border-radius: 10px;
+        padding: 5px 10px;
+        border: 1px solid #333;
+    }
+
+    .clear-button {
+        display: none;
+    }
+
+    .style-box {
+        display: none;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 70%;
+        height: 80%;
+        transform: translate(-50%, -50%);
+        background-color: #fff;
+        border-radius: 10px;
+        border: 1px solid #333;
+        padding: 10px;
+    }
+
+    .image-list {
+        height: 90%;
+        overflow-y: scroll;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-around;
+    }
+
+    .image-list img {
+        cursor: pointer;
+        border: 2px solid transparent;
+        margin-bottom: 5px;
+        width: 200px;
+        height: 200px;
+    }
+
+    .image-list img.active {
+        border: 2px solid red;
+    }
+
+    .hide {
+        display: none;
+    }
+
+    .show {
+        display: block;
+    }
+</style>
